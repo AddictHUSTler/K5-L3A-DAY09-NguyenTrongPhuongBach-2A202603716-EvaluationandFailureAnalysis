@@ -88,6 +88,10 @@ M6: spec v2.1 thêm `pass_hat_5` blocking ≥ 0.80. A/A có Δ = 0;
 baseline 0.8929, flaky 0.5714 → exit 1. Fixed và honest_refactor qua gate.
 Số liệu và cách chọn sàn: [eval card](eval_card.md#m6--nhiễu-và-độ-tin-cậy).
 
+M7: report sai coverage, trùng trial, đổi seed/slice, thiếu score hoặc có lỗi
+grader → `INTEGRITY`, exit 1. CI lấy spec từ base commit để chặn nới ngưỡng,
+bỏ metric/slice hoặc tắt blocking/CI. [Kết quả trap](eval_card.md#m7--chống-gian-lận-eval).
+
 ## Phê duyệt
 
 Product và Eval owner xác nhận trong PR trước merge; hiện chưa ký duyệt.

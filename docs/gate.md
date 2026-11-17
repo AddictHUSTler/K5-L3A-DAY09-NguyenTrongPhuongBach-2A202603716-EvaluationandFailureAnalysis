@@ -38,3 +38,42 @@ python -m lab9.gate --pr reports/eval_seeded_regression.json --baseline reports/
 
 `src/harness_map.yaml` v1.2 includes `sections.eval`. The three generated
 M4 reports are included by `.gitignore`; other reports remain ignored.
+
+## M7 — Integrity và ratchet
+
+V2 dùng baseline `E-swarm-20261117-13cf`, SHA `13cf1d278e93`, spec 2.1.
+Chạy từ `src/` của repo kết hợp Lab 8/9:
+
+```bash
+python -m pytest -q -m student -o addopts= -k "advanced or m7"
+python -m lab9.mutation --spec config/metric_spec_v2.yaml --baseline reports/baseline_v2.json --base-spec config/metric_spec_v2.yaml
+python -m lab9.traps --pr reports/eval_slice_regression.json --baseline reports/baseline_v2.json --spec config/metric_spec_v2.yaml
+```
+
+`traps` sinh file trong `reports/traps/` và in lệnh gate riêng cho từng file.
+Đã chạy riêng cả bốn lệnh, đều exit 1 với lý do `INTEGRITY`:
+
+```text
+evaluator_errors_as_nan.json: exit 1 — INTEGRITY PR: invalid grader value refund_amount_correct at E-014@11
+dropped_failing_rows.json: exit 1 — INTEGRITY PR: row count differs from manifest items × seeds
+cherry_picked_seeds.json: exit 1 — INTEGRITY PR: invalid metric pass_hat_3
+loosened_spec.json: exit 1 — INTEGRITY ratchet: metrics:db_fact_kept loosened min
+```
+
+Lệnh `loosened_spec` dùng `--spec reports/traps/loosened_spec.spec.yaml`
+và `--base-spec config/metric_spec_v2.yaml`. Trong CI, `--base-spec` của mutation
+lấy từ base commit của PR; workflow dispatch dùng commit hiện tại.
+
+Kiểm tra local trong checkout tạm kết hợp Lab 8/9: 128 student test PASS
+(3 deselected), gồm 27 test M7. Mutation exit 0:
+
+```text
+fixed                expect merge got merge ok
+honest_refactor      expect merge got merge ok
+seeded_regression    expect block got block ok
+slice_regression     expect block got block ok
+flaky_regression     expect block got block ok
+mutation score 3/3 · false alarms 0
+```
+
+A/A chạy lại với seeds 66/77/88/99/110: mọi metric có Δ = 0, exit 0.

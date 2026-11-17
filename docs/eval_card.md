@@ -138,3 +138,22 @@ python -m lab9.eval --shape flaky_regression --spec config/metric_spec_v2.yaml
 python -m lab9.gate --pr reports/eval_flaky_regression.json --baseline reports/baseline_v2.json --spec config/metric_spec_v2.yaml
 python -m lab9.mutation --spec config/metric_spec_v2.yaml --baseline reports/baseline_v2.json
 ```
+
+## M7 — Chống gian lận eval
+
+Gate kiểm tra đủ item × seed, trial duy nhất, seed và slice tag khớp baseline,
+score hữu hạn và không thiếu, không có evaluator failure. `--base-spec` chặn
+bỏ metric/slice, tắt blocking/CI hoặc nới min, max, max_increase trên cùng v2.
+
+| Trap | Gate |
+|---|---|
+| evaluator_errors_as_nan | exit 1 — INTEGRITY |
+| dropped_failing_rows | exit 1 — INTEGRITY |
+| cherry_picked_seeds | exit 1 — INTEGRITY |
+| loosened_spec | exit 1 — INTEGRITY ratchet (`--base-spec`) |
+
+Hai trường hợp ẩn gợi ý cũng đã có regression test: thay một trial bằng dòng
+trùng dù tổng số dòng không đổi; thêm `evaluator_failures` vào run xanh.
+Baseline so với chính nó, fixed và honest_refactor vẫn merge.
+Lệnh tái hiện và output: [gate.md](gate.md#m7--integrity-và-ratchet).
+CI v2 chạy test M7, mutation với spec từ base commit, và toàn bộ trap công khai.

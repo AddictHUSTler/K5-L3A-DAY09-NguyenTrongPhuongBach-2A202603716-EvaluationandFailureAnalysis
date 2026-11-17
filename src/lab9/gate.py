@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+from collections import Counter
 from pathlib import Path
 
 from lab8.console import utf8_stdio
 from lab9 import stats
 from lab9.eval import SPEC, load_spec, per_item
+from lab9.graders import GRADERS
 
 
 def integrity_check(pr: dict, base: dict, spec: dict, base_spec: dict | None = None) -> list[str]:
@@ -33,8 +36,94 @@ def integrity_check(pr: dict, base: dict, spec: dict, base_spec: dict | None = N
         including dropping no_significant_drop)
       - an item's slice tags in PR rows differ from the baseline's (relabelling an item out of a
         slice hides its regression from the slice gate)"""
-    # TODO M7
-    return []
+    problems = []
+
+    def finite(value):
+        return isinstance(value, (int, float)) and math.isfinite(value)
+
+    graded = {m["id"] for m in spec["metrics"]
+              if m["id"] in GRADERS or m.get("grader") == "code"
+              or any(m["id"] in row for row in base.get("rows", []))}
+    if any(m["id"].startswith(("pass_at_", "pass_hat_", "pass_"))
+           or m["id"] == "cost_per_success" for m in spec["metrics"]):
+        graded.add("pass_rate")
+    pairs, tags = {}, {}
+    for name, report in (("PR", pr), ("baseline", base)):
+        manifest = report.get("manifest", {})
+        rows = report.get("rows", [])
+        seeds = manifest.get("seeds", [])
+        items = manifest.get("items")
+        if (not seeds or any(type(s) is not int for s in seeds)
+                or len(set(seeds)) != len(seeds)
+                or type(items) is not int or items < 1):
+            problems.append(f"{name}: invalid item/seed manifest")
+            continue
+        if len(rows) != items * len(seeds):
+            problems.append(f"{name}: row count differs from manifest items × seeds")
+        if report.get("evaluator_failures"):
+            problems.append(f"{name}: evaluator_failures is non-empty")
+        metrics = report.get("metrics", {})
+        for mid in set(metrics) | {m["id"] for m in spec["metrics"]}:
+            if not finite(metrics.get(mid)):
+                problems.append(f"{name}: invalid metric {mid}")
+        counts, item_tags = Counter(), {}
+        for row in rows:
+            item, seed = row.get("item_id"), row.get("seed")
+            if not isinstance(item, str) or type(seed) is not int:
+                problems.append(f"{name}: invalid trial identity")
+                continue
+            counts[item, seed] += 1
+            if "cost" in row and (not finite(row["cost"]) or row["cost"] < 0):
+                problems.append(f"{name}: invalid cost at {item}@{seed}")
+            slices = row.get("slices", [])
+            if not isinstance(slices, list) or any(not isinstance(s, str) for s in slices):
+                problems.append(f"{name}: invalid slice tags for {item}")
+                continue
+            tag_set = frozenset(slices)
+            if item in item_tags and item_tags[item] != tag_set:
+                problems.append(f"{name}: inconsistent slice tags for {item}")
+            item_tags[item] = tag_set
+            for mid in graded:
+                if not finite(row.get(mid)) or row[mid] not in (0, 1):
+                    problems.append(f"{name}: invalid grader value {mid} at {item}@{seed}")
+        if any(n != 1 for n in counts.values()):
+            problems.append(f"{name}: duplicate trials")
+        item_ids = {item for item, _ in counts}
+        if len(item_ids) != items or set(counts) != {(i, s) for i in item_ids for s in seeds}:
+            problems.append(f"{name}: incomplete item × seed coverage")
+        pairs[name], tags[name] = set(counts), item_tags
+        if "seeds" in spec and set(seeds) != set(spec["seeds"]):
+            problems.append(f"{name}: seeds differ from spec")
+    if pairs.get("PR") != pairs.get("baseline"):
+        problems.append("PR trials differ from baseline (item_id, seed) pairs")
+    if tags.get("PR") != tags.get("baseline"):
+        problems.append("PR item slice tags differ from baseline")
+
+    if base_spec is not None and spec.get("eval_set_version") == base_spec.get("eval_set_version"):
+        def ratchet(old, new, label):
+            if old.get("blocking") and not new.get("blocking"):
+                problems.append(f"ratchet: {label} is no longer blocking")
+            for key in ("min", "max", "max_increase"):
+                if key in old and (key not in new or not finite(new[key])
+                                   or (new[key] < old[key] if key == "min" else new[key] > old[key])):
+                    problems.append(f"ratchet: {label} loosened {key}")
+            if old.get("no_significant_drop") and not new.get("no_significant_drop"):
+                problems.append(f"ratchet: {label} dropped no_significant_drop")
+
+        for group, identity in (("metrics", lambda m: m["id"]),
+                                ("slices", lambda s: (s["name"], s["metric"]))):
+            entries = {identity(e): e for e in spec.get(group, [])}
+            for old in base_spec.get(group, []):
+                key = identity(old)
+                label = f"{group}:{key}"
+                if key not in entries:
+                    problems.append(f"ratchet: removed {label}")
+                    continue
+                new = entries[key]
+                ratchet(old, new, label)
+                if group == "metrics":
+                    ratchet(old.get("threshold", {}), new.get("threshold", {}), label)
+    return problems
 
 
 def slice_check(pr: dict, base: dict, spec: dict) -> tuple[list[str], list[str]]:
