@@ -49,3 +49,15 @@ def test_paired_bootstrap_reference(stats):
 
 def test_paired_bootstrap_identical_is_zero(stats):
     assert stats.paired_bootstrap([1, 0, 1], [1, 0, 1]) == (0.0, 0.0, 0.0)
+
+
+def test_paired_bootstrap_preserves_pairing(stats):
+    # Each item improves equally; unpaired sampling would invent uncertainty.
+    assert stats.paired_bootstrap([1, 2, 3], [0, 1, 2]) == pytest.approx((1.0, 1.0, 1.0))
+
+
+@pytest.mark.parametrize("a,b", [([], []), ([1, 0], [1]), ([1, float("nan")], [1, 0]),
+                                 ([1, 0], [1, float("inf")]), ([[1, 0]], [[1, 0]])])
+def test_paired_bootstrap_rejects_invalid_pairs(stats, a, b):
+    with pytest.raises(ValueError):
+        stats.paired_bootstrap(a, b)
