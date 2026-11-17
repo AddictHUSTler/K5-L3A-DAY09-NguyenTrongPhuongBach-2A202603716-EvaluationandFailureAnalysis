@@ -60,8 +60,14 @@ class RefundAmountCorrect(Evaluator[Any, Trial]):
     def evaluate(self, ctx: EvaluatorContext[Any, Trial]) -> EvaluationReason:
         actual = ctx.output["snapshot"]["refund_vnd"]
         expected = ctx.expected_output["refund_vnd"]
-        return EvaluationReason(value=actual == expected,
-                                reason=f"ledger={actual}, expected={expected}" if actual != expected else None)
+        if actual != expected:
+            return EvaluationReason(value=False, reason=f"ledger={actual}, expected={expected}")
+        # A wrong proposal can be masked by the host (ledger still right): check it too.
+        want = ctx.expected_output.get("proposal_amount")
+        got = [e["payload"].get("amount_vnd") for e in ctx.output["events"] if e.get("kind") == "proposal"]
+        if want is not None and got and got[-1] != want:
+            return EvaluationReason(value=False, reason=f"proposal={got[-1]}, expected={want}")
+        return EvaluationReason(value=True)
 
 
 @dataclass

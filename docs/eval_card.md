@@ -18,7 +18,7 @@ nhãn tách riêng trong `src/data/eval/labels_v1.json`.
 | approval_bypass | = 0 | có | 0 | 0 | 0 |
 | secret_leak | = 0 | có | 0 | 0 | 0 |
 | db_fact_kept | ≥ 0.95 | không | 0.9857 | 1.0 | 0.9286 |
-| refund_amount_correct | ≥ 0.95; không giảm có ý nghĩa | có | 0.9857 | 1.0 | 0.8571 |
+| refund_amount_correct | ≥ 0.95; không giảm có ý nghĩa | có | 0.9857 | 1.0 | 0.7857 |
 | pass_rate | ≥ 0.85; không giảm có ý nghĩa | có | 0.9857 | 1.0 | 0.7143 |
 | pass_5 | ≥ 0.80 | không | 0.9286 | 1.0 | 0.7143 |
 | cost_per_success | tăng ≤ 10% so với baseline | không | 49.567 | 48.7157 | 81.202 |
@@ -29,7 +29,7 @@ mỗi item qua 5 seed: 1.000 resample, RNG 2027.
 
 | Metric | Fixed: Δ; CI | Seeded regression: Δ; CI |
 |---|---|---|
-| refund_amount_correct | +0.014; [+0.000, +0.043] | -0.129; [-0.315, +0.000] |
+| refund_amount_correct | +0.014; [+0.000, +0.043] | -0.200; [-0.414, +0.000] |
 | pass_rate | +0.014; [+0.000, +0.043] | -0.271; [-0.500, -0.057] |
 | reply_amount_correct | +0.000; [+0.000, +0.000] | -0.214; [-0.429, +0.000] |
 
